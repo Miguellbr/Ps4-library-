@@ -271,13 +271,6 @@ async function resolvePublicLink(page, originalUrl, depth = 0) {
     status = response?.status?.() ?? null;
     await new Promise(resolve => setTimeout(resolve, 900));
 
-const response = await page.goto(originalUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: NAV_TIMEOUT
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 900));
-
     finalUrl = page.url() || originalUrl;
     title = cleanText(await page.title().catch(() => ''));
   } catch (error) {
