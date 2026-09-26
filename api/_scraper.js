@@ -214,11 +214,19 @@ function scoreCandidate(item, pageUrl) {
 }
 
 function classifyCandidate(item) {
-  const haystack = cleanText(`${item.text} ${item.context} ${item.href}`);
+  function classifyCandidate(item) {
+  const text = cleanText(`${item.text} ${item.href}`);
 
-  if (DLC_RE.test(haystack)) return 'dlcs';
-  if (UPDATE_RE.test(haystack)) return 'updates';
+  if (DLC_RE.test(text)) {
+    return 'dlcs';
+  }
+
+  if (UPDATE_RE.test(text)) {
+    return 'updates';
+  }
+
   return 'base';
+  
 }
 
 async function extractLinks(page, pageUrl) {
