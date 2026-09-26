@@ -38,24 +38,49 @@ const UPDATE_RE = /\b(update|patch|version|ver\.?\s*\d|v\d+\.\d+)\b/i;
 function cleanText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
-async function findGamePageFromTag(page, gameName) {
+async function findGamePageFromTag(page, gameName, tagUrl) {
   const normalizedName = cleanText(gameName).toLowerCase();
 
-  return await page.evaluate((target) => {
+  let tagSlug = '';
+  try {
+    const pathname = new URL(tagUrl).pathname;
+    tagSlug = pathname
+      .replace(/^\/tag\//i, '')
+      .replace(/\/$/, '')
+      .replace(/-/g, ' ')
+      .trim()
+      .toLowerCase();
+  } catch {}
+
+  return await page.evaluate(({ target, slug }) => {
     const normalize = value =>
       String(value || '')
-        .replace(/\s+/g, ' ')
+        .replace(/\\s+/g, ' ')
         .trim()
         .toLowerCase();
 
+    const slugify = value =>
+      normalize(value)
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
     const links = [...document.querySelectorAll('a[href]')];
 
-    const exact = links.find(a =>
-      normalize(a.textContent) === target
-    );
+    const exact = target
+      ? links.find(a => normalize(a.textContent) === target)
+      : null;
 
-    return exact?.href || null;
-  }, normalizedName);
+    if (exact?.href) return exact.href;
+
+    const slugMatch = slug
+      ? links.find(a => {
+          const textSlug = slugify(a.textContent);
+          return textSlug === slugify(slug);
+        })
+      : null;
+
+    return slugMatch?.href || null;
+  }, { target: normalizedName, slug: tagSlug });
 }
 
 function hostOf(value) {
@@ -396,7 +421,7 @@ async function scrapeDLSP({ url, titleId = '', gameName = '' }) {
     const isTagPage = new URL(url).pathname.startsWith('/tag/');
 
     if (isTagPage) {
-      const gamePageUrl = await findGamePageFromTag(page, gameName);
+      const gamePageUrl = await findGamePageFromTag(page, gameName, url);
 
       if (!gamePageUrl) {
         throw new Error(
