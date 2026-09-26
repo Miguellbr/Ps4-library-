@@ -72,8 +72,7 @@ module.exports = async function handler(req, res) {
       console.error('Falha ao carregar /api/_scraper.js:', error);
       return sendJson(res, 500, {
         success: false,
-        error: 'Falha ao carregar o scraper.',
-        detail: error?.message || String(error)
+        error: `Falha ao carregar o scraper: ${error?.message || String(error)}`
       });
     }
 
