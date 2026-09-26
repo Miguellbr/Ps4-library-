@@ -204,25 +204,16 @@ function classifyCandidate(item) {
 
 async function extractLinks(page, pageUrl) {
   const items = await page.evaluate(() => {
-    const nodes = Array.from(document.querySelectorAll('a[href], [data-href], [data-url]'));
+    const nodes = Array.from(document.querySelectorAll('a[href]'));
     const result = [];
 
     for (const node of nodes) {
-      let raw = node.getAttribute('href') || node.getAttribute('data-href') || node.getAttribute('data-url') || '';
-      const onclick = node.getAttribute('onclick') || '';
-
-      if (!raw && onclick) {
-        const match = onclick.match(/https?:\/\/[^'"\s)]+/i);
-        if (match) raw = match[0];
-      }
-
-      const text = (node.innerText || node.textContent || '').trim();
+      const raw = node.getAttribute('href') || '';
+      const text = cleanText(node.innerText || node.textContent || '');
       const parent = node.closest('li, tr, td, p, article, .download, .links, .entry-content, .post-content');
-      const context = parent ? (parent.innerText || parent.textContent || '').trim() : '';
+      const context = cleanText(parent ? (parent.innerText || parent.textContent || '') : '');
 
-      if (raw) {
-        result.push({ raw, text, context });
-      }
+      if (raw) result.push({ raw, text, context });
     }
 
     return result;
@@ -235,17 +226,33 @@ async function extractLinks(page, pageUrl) {
     const href = normalizeUrl(item.raw, pageUrl);
     if (!href || seen.has(href)) continue;
 
+    const host = hostOf(href);
+    if (!host || DLSP_HOST_RE.test(host)) continue;
+
+    // Ignore ordinary site/navigation links unless they carry a strong
+    // download-related signal or point to a recognized external file host.
     const candidate = {
       href,
-      text: cleanText(item.text) || 'Link encontrado',
+      text: cleanText(item.text),
       context: cleanText(item.context)
     };
 
     const score = scoreCandidate(candidate, pageUrl);
+    const recognizedHost = DOWNLOAD_HOST_HINTS.some(hint => host.includes(hint));
+    const strongDownloadSignal =
+      DOWNLOAD_TEXT_RE.test(candidate.text) ||
+      DOWNLOAD_TEXT_RE.test(candidate.context) ||
+      /\\.(pkg|zip|rar|7z)(?:$|[?#])/i.test(href);
+
+    if (!recognizedHost && !strongDownloadSignal) continue;
     if (score < 2) continue;
 
     seen.add(href);
-    candidates.push({ ...candidate, score });
+    candidates.push({
+      ...candidate,
+      score,
+      host
+    });
   }
 
   candidates.sort((a, b) => b.score - a.score);
@@ -467,24 +474,18 @@ async function scrapeDLSP({ url, titleId = '', gameName = '' }) {
       }
     };
 
-    // Resolve sequentially so one problematic host cannot stop the rest.
     for (const item of links) {
       const type = classifyCandidate(item);
-      const resolved = await resolvePublicLink(page, item.href);
-
-      if (resolved.success) {
-        result.stats.resolved += 1;
-      } else {
-        result.stats.failed += 1;
-      }
-
       result.links[type].push({
-        originalUrl: item.href,
+        url: item.href,
+        host: item.host,
         text: item.text,
-        type,
-        resolved
+        type
       });
     }
+
+    result.stats.resolved = 0;
+    result.stats.failed = 0;
 
     return result;
   } finally {
