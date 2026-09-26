@@ -32,6 +32,7 @@ module.exports = async function handler(req, res) {
 
     const url = String(body.url || '').trim();
     const titleId = String(body.titleId || '').trim();
+    const gameName = String(body.gameName || '').trim();
 
     if (!url) {
       return sendJson(res, 400, {
@@ -66,7 +67,8 @@ module.exports = async function handler(req, res) {
 
     const result = await scrapeDLSP({
       url,
-      titleId
+      titleId,
+      gameName
     });
 
     return sendJson(res, 200, result);
