@@ -2136,7 +2136,7 @@ font-size: 0.9rem;
                             <button
                                 class="btn-primary"
                                 type="button"
-                                onclick="resolveDLSP('${escapeHtml(game.title_id)}', '${escapeHtml(game.title)}')"
+                                onclick="resolveDLSP(${escapeHtml(JSON.stringify(game.title_id))}, ${escapeHtml(JSON.stringify(game.title))})"
                             >
                                 ${lang.dlsp_btn}
                             </button>
