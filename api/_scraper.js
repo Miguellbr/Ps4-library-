@@ -36,6 +36,7 @@ const UPDATE_RE = /\b(update|patch|version|ver\.?\s*\d|v\d+\.\d+)\b/i;
 function cleanText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
 }
+
 async function findGamePageFromTag(page, gameName, tagUrl) {
   const normalizedName = cleanText(gameName).toLowerCase();
 
@@ -229,8 +230,6 @@ async function extractLinks(page, pageUrl) {
     const host = hostOf(href);
     if (!host || DLSP_HOST_RE.test(host)) continue;
 
-    // Ignore ordinary site/navigation links unless they carry a strong
-    // download-related signal or point to a recognized external file host.
     const candidate = {
       href,
       text: cleanText(item.text),
@@ -242,7 +241,7 @@ async function extractLinks(page, pageUrl) {
     const strongDownloadSignal =
       DOWNLOAD_TEXT_RE.test(candidate.text) ||
       DOWNLOAD_TEXT_RE.test(candidate.context) ||
-      /\\.(pkg|zip|rar|7z)(?:$|[?#])/i.test(href);
+      /\.(pkg|zip|rar|7z)(?:$|[?#])/i.test(href);
 
     if (!recognizedHost && !strongDownloadSignal) continue;
     if (score < 2) continue;
@@ -474,18 +473,51 @@ async function scrapeDLSP({ url, titleId = '', gameName = '' }) {
       }
     };
 
+    // Cache para evitar resolver o mesmo URL várias vezes
+    const resolutionCache = new Map();
+
     for (const item of links) {
+      const originalHref = item.href;
+      
+      // Verifica se já resolveu este URL
+      let resolution;
+      if (resolutionCache.has(originalHref)) {
+        resolution = resolutionCache.get(originalHref);
+      } else {
+        try {
+          // Tenta resolver o link público
+          resolution = await resolvePublicLink(page, originalHref, 0);
+          resolutionCache.set(originalHref, resolution);
+        } catch (error) {
+          // Em caso de erro inesperado, registra como falha
+          resolution = {
+            success: false,
+            url: null,
+            host: null,
+            error: error.message || 'Erro ao resolver link.'
+          };
+          resolutionCache.set(originalHref, resolution);
+        }
+      }
+
       const type = classifyCandidate(item);
-      result.links[type].push({
-        url: item.href,
-        host: item.host,
+      
+      const linkEntry = {
+        url: resolution.success && resolution.url ? resolution.url : originalHref,
+        host: resolution.success && resolution.host ? resolution.host : item.host,
         text: item.text,
         type
-      });
-    }
+      };
 
-    result.stats.resolved = 0;
-    result.stats.failed = 0;
+      result.links[type].push(linkEntry);
+
+      // Atualiza estatísticas
+      if (resolution.success) {
+        result.stats.resolved++;
+      } else {
+        result.stats.failed++;
+      }
+    }
 
     return result;
   } finally {
