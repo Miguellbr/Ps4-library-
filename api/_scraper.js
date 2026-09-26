@@ -246,33 +246,12 @@ async function resolvePublicLink(page, originalUrl, depth = 0) {
     status = response?.status?.() ?? null;
     await new Promise(resolve => setTimeout(resolve, 900));
 
-const response = await page.goto(url, {
-  waitUntil: 'domcontentloaded',
-  timeout: NAV_TIMEOUT
-});
+const response = await page.goto(originalUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: NAV_TIMEOUT
+    });
 
-await new Promise(resolve => setTimeout(resolve, 1200));
-
-const isTagPage = new URL(url).pathname.startsWith('/tag/');
-
-if (isTagPage) {
-  const gameName = titleId;
-
-  const gamePageUrl = await findGamePageFromTag(page, gameName);
-
-  if (!gamePageUrl) {
-    throw new Error(
-      `Não encontrei a página individual de "${gameName}" na página de tag.`
-    );
-  }
-
-  await page.goto(gamePageUrl, {
-    waitUntil: 'domcontentloaded',
-    timeout: NAV_TIMEOUT
-  });
-
-  await new Promise(resolve => setTimeout(resolve, 1200));
-}
+    await new Promise(resolve => setTimeout(resolve, 900));
 
     finalUrl = page.url() || originalUrl;
     title = cleanText(await page.title().catch(() => ''));
@@ -383,7 +362,7 @@ async function launchBrowser() {
   });
 }
 
-async function scrapeDLSP({ url, titleId = '' }) {
+async function scrapeDLSP({ url, titleId = '', gameName = '' }) {
   const parsed = new URL(url);
 
   if (!DLSP_HOST_RE.test(parsed.hostname)) {
@@ -413,6 +392,25 @@ async function scrapeDLSP({ url, titleId = '' }) {
     });
 
     await new Promise(resolve => setTimeout(resolve, 1200));
+
+    const isTagPage = new URL(url).pathname.startsWith('/tag/');
+
+    if (isTagPage) {
+      const gamePageUrl = await findGamePageFromTag(page, gameName);
+
+      if (!gamePageUrl) {
+        throw new Error(
+          `Não encontrei a página individual de "${gameName || titleId}" na página de tag.`
+        );
+      }
+
+      await page.goto(gamePageUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: NAV_TIMEOUT
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    }
 
     const pageTitle = cleanText(await page.title().catch(() => ''));
     const finalPageUrl = page.url() || url;
