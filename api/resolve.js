@@ -1,5 +1,3 @@
-const { scrapeDLSP } = require('./_scraper');
-
 const MAX_BODY_BYTES = 32 * 1024;
 
 function sendJson(res, status, payload) {
@@ -9,15 +7,15 @@ function sendJson(res, status, payload) {
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return sendJson(res, 405, {
-      success: false,
-      error: 'Método não permitido. Use POST.'
-    });
-  }
-
   try {
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST');
+      return sendJson(res, 405, {
+        success: false,
+        error: 'Método não permitido. Use POST.'
+      });
+    }
+
     const contentLength = Number(req.headers['content-length'] || 0);
     if (contentLength > MAX_BODY_BYTES) {
       return sendJson(res, 413, {
@@ -62,6 +60,20 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 400, {
         success: false,
         error: 'A URL precisa pertencer ao DLPSGame.'
+      });
+    }
+
+    // Carrega o scraper dentro do handler para que falhas de runtime/dependência
+    // apareçam como JSON em vez de um 500 opaco do Vercel.
+    let scrapeDLSP;
+    try {
+      ({ scrapeDLSP } = require('./_scraper'));
+    } catch (error) {
+      console.error('Falha ao carregar /api/_scraper.js:', error);
+      return sendJson(res, 500, {
+        success: false,
+        error: 'Falha ao carregar o scraper.',
+        detail: error?.message || String(error)
       });
     }
 
