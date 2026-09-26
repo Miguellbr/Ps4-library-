@@ -2136,7 +2136,7 @@ font-size: 0.9rem;
                             <button
                                 class="btn-primary"
                                 type="button"
-                                onclick="resolveDLSP('${escapeHtml(game.title_id)}')"
+                                onclick="resolveDLSP('${escapeHtml(game.title_id)}', '${escapeHtml(game.title)}')"
                             >
                                 ${lang.dlsp_btn}
                             </button>
@@ -2281,7 +2281,7 @@ font-size: 0.9rem;
 
     // ==================== DLSP INTEGRATION ====================
 
-    async function resolveDLSP(titleId) {
+    async function resolveDLSP(titleId, gameName) {
 
         const input =
             document.getElementById('dlsp-url');
@@ -2368,10 +2368,7 @@ font-size: 0.9rem;
                                 'application/json'
                         },
 
-                        body: JSON.stringify({
-                            url,
-                            titleId
-                        })
+                        body: JSON.stringify({ url, titleId, gameName })
                     }
                 );
 
