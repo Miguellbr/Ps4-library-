@@ -1,8 +1,16 @@
+const FLY_SCRAPER_URL = 'https://ps4-scraper.fly.dev/scrape';
+const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+
 const MAX_BODY_BYTES = 32 * 1024;
 
 function sendJson(res, status, payload) {
-  res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.status(status).setHeader(
+    'Content-Type',
+    'application/json; charset=utf-8'
+  );
+
   res.setHeader('Cache-Control', 'no-store');
+
   return res.json(payload);
 }
 
@@ -10,13 +18,17 @@ module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST');
+
       return sendJson(res, 405, {
         success: false,
         error: 'Método não permitido. Use POST.'
       });
     }
 
-    const contentLength = Number(req.headers['content-length'] || 0);
+    const contentLength = Number(
+      req.headers['content-length'] || 0
+    );
+
     if (contentLength > MAX_BODY_BYTES) {
       return sendJson(res, 413, {
         success: false,
@@ -24,11 +36,14 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    const body =
+      typeof req.body === 'string'
+        ? JSON.parse(req.body)
+        : (req.body || {});
+
     const url = String(body.url || '').trim();
     const titleId = String(body.titleId || '').trim();
     const gameName = String(body.gameName || '').trim();
-    const attemptCaptcha = Boolean(body.attemptCaptcha);
 
     if (!url) {
       return sendJson(res, 400, {
@@ -38,6 +53,7 @@ module.exports = async function handler(req, res) {
     }
 
     let parsed;
+
     try {
       parsed = new URL(url);
     } catch {
@@ -61,49 +77,67 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Verifica se o serviço Fly.io está configurado
-    const scraperUrl = process.env.SCRAPER_SERVICE_URL;
-    const scraperApiKey = process.env.SCRAPER_API_KEY;
+    if (!SCRAPER_API_KEY) {
+      console.error('[RESOLVE] SCRAPER_API_KEY não configurada.');
 
-    if (!scraperUrl || !scraperApiKey) {
       return sendJson(res, 500, {
         success: false,
-        error: 'Serviço de scraping não configurado. Defina SCRAPER_SERVICE_URL e SCRAPER_API_KEY nas variáveis de ambiente.'
+        error: 'SCRAPER_API_KEY não configurada na Vercel.'
       });
     }
 
-    // Faz a requisição para o Fly.io
-    const response = await fetch(`${scraperUrl}/scrape`, {
+    console.log('[RESOLVE] Enviando para Fly:', url);
+
+    const flyResponse = await fetch(FLY_SCRAPER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': scraperApiKey
+        'x-api-key': SCRAPER_API_KEY
       },
       body: JSON.stringify({
         url,
         titleId,
-        gameName,
-        attemptCaptcha
+        gameName
       })
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Erro do serviço Fly.io:', response.status, errorText);
+    const responseText = await flyResponse.text();
+
+    let flyData;
+
+    try {
+      flyData = JSON.parse(responseText);
+    } catch {
+      flyData = {
+        success: false,
+        error: 'A Fly retornou uma resposta que não é JSON.',
+        raw: responseText
+      };
+    }
+
+    if (!flyResponse.ok) {
+      console.error(
+        '[RESOLVE] Fly respondeu:',
+        flyResponse.status,
+        flyData
+      );
+
       return sendJson(res, 502, {
         success: false,
-        error: `Serviço de scraping retornou erro ${response.status}: ${errorText}`
+        error: 'O servidor scraper da Fly retornou um erro.',
+        flyStatus: flyResponse.status,
+        fly: flyData
       });
     }
 
-    const result = await response.json();
-    return sendJson(res, 200, result);
+    return sendJson(res, 200, flyData);
 
   } catch (error) {
-    console.error('Erro em /api/resolve:', error);
+    console.error('[RESOLVE] Erro:', error);
+
     return sendJson(res, 502, {
       success: false,
-      error: error?.message || 'Falha ao processar a página.'
+      error: error?.message || 'Falha ao comunicar com o scraper da Fly.'
     });
   }
 };
