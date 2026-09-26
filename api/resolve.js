@@ -24,13 +24,11 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const body = typeof req.body === 'string'
-      ? JSON.parse(req.body)
-      : (req.body || {});
-
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const url = String(body.url || '').trim();
     const titleId = String(body.titleId || '').trim();
     const gameName = String(body.gameName || '').trim();
+    const attemptCaptcha = Boolean(body.attemptCaptcha);
 
     if (!url) {
       return sendJson(res, 400, {
@@ -63,29 +61,46 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Carrega o scraper dentro do handler para que falhas de runtime/dependência
-    // apareçam como JSON em vez de um 500 opaco do Vercel.
-    let scrapeDLSP;
-    try {
-      ({ scrapeDLSP } = require('./_scraper'));
-    } catch (error) {
-      console.error('Falha ao carregar /api/_scraper.js:', error);
+    // Verifica se o serviço Fly.io está configurado
+    const scraperUrl = process.env.SCRAPER_SERVICE_URL;
+    const scraperApiKey = process.env.SCRAPER_API_KEY;
+
+    if (!scraperUrl || !scraperApiKey) {
       return sendJson(res, 500, {
         success: false,
-        error: `Falha ao carregar o scraper: ${error?.message || String(error)}`
+        error: 'Serviço de scraping não configurado. Defina SCRAPER_SERVICE_URL e SCRAPER_API_KEY nas variáveis de ambiente.'
       });
     }
 
-    const result = await scrapeDLSP({
-      url,
-      titleId,
-      gameName
+    // Faz a requisição para o Fly.io
+    const response = await fetch(`${scraperUrl}/scrape`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': scraperApiKey
+      },
+      body: JSON.stringify({
+        url,
+        titleId,
+        gameName,
+        attemptCaptcha
+      })
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Erro do serviço Fly.io:', response.status, errorText);
+      return sendJson(res, 502, {
+        success: false,
+        error: `Serviço de scraping retornou erro ${response.status}: ${errorText}`
+      });
+    }
+
+    const result = await response.json();
     return sendJson(res, 200, result);
+
   } catch (error) {
     console.error('Erro em /api/resolve:', error);
-
     return sendJson(res, 502, {
       success: false,
       error: error?.message || 'Falha ao processar a página.'
