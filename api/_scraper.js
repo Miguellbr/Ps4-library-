@@ -1,6 +1,5 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
-const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 
 const DLSP_HOST_RE = /(^|\.)dlpsgame\.com$/i;
@@ -345,6 +344,8 @@ async function resolvePublicLink(page, originalUrl, depth = 0) {
 }
 
 async function launchBrowser() {
+  const puppeteerModule = await import('puppeteer-core');
+  const puppeteer = puppeteerModule.default || puppeteerModule;
   const isVercel = Boolean(process.env.VERCEL);
 
   if (!isVercel && process.env.CHROMIUM_EXECUTABLE_PATH) {
