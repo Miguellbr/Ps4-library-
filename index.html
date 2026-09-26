@@ -2244,13 +2244,14 @@ font-size: 0.9rem;
                         ? `
                             <div class="tree-actions">
 
-                                <button
+                                <a
                                     class="btn-small btn-download"
-                                    type="button"
-                                    onclick="copyToClipboard(${JSON.stringify(url)})"
+                                    href="${escapeHtml(url)}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                 >
-                                    📋 ${lang.copy_link}
-                                </button>
+                                    🔗 Abrir Link
+                                </a>
 
                                 <a
                                     href="${escapeHtml(url)}"
@@ -2539,13 +2540,14 @@ font-size: 0.9rem;
 
                         <div class="tree-actions">
 
-                            <button
+                            <a
                                 class="btn-small btn-download"
-                                type="button"
-                                onclick="copyToClipboard(${JSON.stringify(displayUrl)})"
+                                href="${escapeHtml(displayUrl)}"
+                                target="_blank"
+                                rel="noopener noreferrer"
                             >
-                                📋 Copiar Link
-                            </button>
+                                🔗 Abrir Link
+                            </a>
 
                             ${
                                 displayUrl
